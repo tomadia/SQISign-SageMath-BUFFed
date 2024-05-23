@@ -79,6 +79,8 @@ verify(): Given a message, and the signature (E1, σ) generates a
 
 # Python imports
 from hashlib import shake_128
+from hashlib import sha256
+import pickle
 
 # SageMath imports
 from sage.all import randint, ZZ, factor, proof
@@ -99,6 +101,20 @@ from utilities import inert_prime, has_order_D
 from setup import E0, O0, Bτ, eτ, p, l, Dc, T_prime, ω, e, f_step_max
 
 proof.all(False)
+
+def object_to_bytes(obj):
+    return pickle.dumps(obj)
+
+def encoded_hash_two_objects(obj1, obj2):
+    
+    # Combine the byte representations
+    combined = obj1 + obj2
+    
+    # Compute the SHA256 hash
+    hash_object = sha256(combined)
+    hash_hex = hash_object.hexdigest()
+    
+    return hash_hex.encode('utf-8')
 
 
 class SQISign:
@@ -381,16 +397,19 @@ class SQISign:
                     E1 : the codomain of the commitment
                     S: a compressed bitstring of the response isogeny EA → E2
         """
+        pkBytes = object_to_bytes(self.pk)
+        msgBytes = object_to_bytes(msg)
+        h = encoded_hash_two_objects(pkBytes,msgBytes)
         # Make a commitment
         E1 = self.commitment()
 
         # Use the message to find a challenge
-        ϕ_ker = self.challenge_from_message(E1, msg)
+        ϕ_ker = self.challenge_from_message(E1, h)
 
         # Compute a response for the challenge
         S = self.response(ϕ_ker)
 
-        return (E1, S)
+        return (E1, S, h)
 
     def verify_response(self, EA, E1, S, ϕ_ker):
         """
@@ -472,11 +491,21 @@ class SQISign:
                msg: the message which has been signed
         Output: True if the response is value, False otherwise
         """
+        pkBytesTemp = object_to_bytes(EA)
+        msgBytesTemp = object_to_bytes(msg)
+        hTemp = encoded_hash_two_objects(pkBytesTemp,msgBytesTemp)
+
+
         # Extract pieces from signature
-        E1, S = sig
+        E1, S, h = sig
 
         # Generate ϕ_ker from the message
-        ϕ_ker = self.challenge_from_message(E1, msg)
+        ϕ_ker = self.challenge_from_message(E1, h)
+
+        #Verify h=hTemp
+        if h!=hTemp:
+            print("h=/=hTemp")
+            return False
 
         # Verify signature
         return self.verify_response(EA, E1, S, ϕ_ker)
