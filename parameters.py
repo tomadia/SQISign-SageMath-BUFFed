@@ -73,4 +73,4 @@ p6983 = {
 # and about 15 minutes for p6983
 
 # params = p_toy
-params = p6983
+params = p_toy
